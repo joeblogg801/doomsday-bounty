@@ -270,4 +270,277 @@ describe("DoomsdayBounty", function () {
     await doomsdayBounty.transferToDAO(bunkerId);
     expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
   });
+
+  it("should NOT be possible to evacuate or transfer bunker outside of a bounty hunt", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    let doomsday = (await ethers.getContractAt(
+      "IDoomsday",
+      DOOMSDAY
+    )) as any as IDoomsday;
+    // find a non vulnerable bunker owned by DAO
+    let bunkerId = 0;
+    for (const [tokenId] of bunkerData) {
+      if (!(await doomsday.isVulnerable(tokenId))) {
+        const owner = await doomsday.ownerOf(tokenId);
+        if (owner === DAO_ADDRESS) {
+          bunkerId = tokenId;
+          break;
+        }
+      }
+    }
+    expect(bunkerId).to.be.greaterThan(0);
+    doomsday = doomsday.connect(DAO);
+
+    // nobody should be able to simply evacuate a bunker
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
+    const [anybody] = await ethers.getSigners();
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    try {
+      await doomsdayBounty.evacuate(bunkerId);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not hunting");
+    }
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
+
+    // nobody should be able to simply transfer a bunker to a contract
+    try {
+      await doomsdayBounty.transferToSelf(bunkerId);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not hunting");
+    }
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
+  });
+
+  it("only DAO should be able to set a bounty fee", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    expect(await doomsdayBounty.bountyFee()).to.equal(50);
+
+    // nobody except DAO should be able to set a bounty fee
+    const [anybody] = await ethers.getSigners();
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    try {
+      await doomsdayBounty.setBountyFee(90);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not DAO");
+    }
+    expect(await doomsdayBounty.bountyFee()).to.equal(50);
+
+    // DAO should NOT be able to set a large bounty fee
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    try {
+      await doomsdayBounty.setBountyFee(110);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("too generous");
+    }
+    expect(await doomsdayBounty.bountyFee()).to.equal(50);
+
+    // DAO should be able to set a zero fee
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    await doomsdayBounty.setBountyFee(0);
+    expect(await doomsdayBounty.bountyFee()).to.equal(0);
+
+    // DAO should be able to set a larger fee
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    await doomsdayBounty.setBountyFee(90);
+    expect(await doomsdayBounty.bountyFee()).to.equal(90);
+  });
+
+  it("only DAO should be able to withdraw from a bounty contract", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    // transfer some ETH into the contract
+    const donation = parseEther("10");
+    const [anybody] = await ethers.getSigners();
+    await anybody.sendTransaction({
+      to: doomsdayBountyAddress,
+      value: donation,
+    });
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance.toBigInt()).to.equal(donation.toBigInt());
+    }
+
+    // nobody except DAO should be able to withdraw
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    try {
+      await doomsdayBounty.withdraw(donation);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not DAO");
+    }
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance.toBigInt()).to.equal(donation.toBigInt());
+    }
+
+    // DAO should be able to withdraw everything
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    const balanceBeforeWithdraw = await DAO.getBalance();
+    const tx = await doomsdayBounty.withdraw(donation);
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance).to.equal(0);
+    }
+    const balanceAfterWithdraw = await DAO.getBalance();
+    const receipt = await tx.wait();
+    const gasCost = receipt.effectiveGasPrice.mul(receipt.gasUsed);
+    const payment = balanceAfterWithdraw
+      .sub(balanceBeforeWithdraw)
+      .add(gasCost);
+    expect(payment.toBigInt()).to.equal(donation.toBigInt());
+  });
+
+  it("only DAO should be able to make arbitrary calls and send ETH out of the contract", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    // transfer some ETH into the contract
+    const donation = parseEther("10");
+    const [anybody] = await ethers.getSigners();
+    await anybody.sendTransaction({
+      to: doomsdayBountyAddress,
+      value: donation,
+    });
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance.toBigInt()).to.equal(donation.toBigInt());
+    }
+
+    // nobody except DAO should be able to make an arbitrary call
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    try {
+      await doomsdayBounty.execute(anybody.address, donation, "0x");
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not DAO");
+    }
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance.toBigInt()).to.equal(donation.toBigInt());
+    }
+
+    // DAO should be able to make an arbitrary call and send funds to anybody
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    const balanceBeforeWithdraw = await anybody.getBalance();
+    await doomsdayBounty.execute(anybody.address, donation, "0x");
+    {
+      const doomsdayBountyBalance = await ethers.provider.getBalance(
+        doomsdayBountyAddress
+      );
+      expect(doomsdayBountyBalance).to.equal(0);
+    }
+    const balanceAfterWithdraw = await anybody.getBalance();
+    const payment = balanceAfterWithdraw.sub(balanceBeforeWithdraw);
+    expect(payment.toBigInt()).to.equal(donation.toBigInt());
+  });
+
+  it("only DAO should be able to make arbitrary calls and send NFT out of the contract", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    let doomsday = (await ethers.getContractAt(
+      "IDoomsday",
+      DOOMSDAY
+    )) as any as IDoomsday;
+    // find a non vulnerable bunker owned by DAO
+    let bunkerId = 0;
+    for (const [tokenId] of bunkerData) {
+      if (!(await doomsday.isVulnerable(tokenId))) {
+        const owner = await doomsday.ownerOf(tokenId);
+        if (owner === DAO_ADDRESS) {
+          bunkerId = tokenId;
+          break;
+        }
+      }
+    }
+    expect(bunkerId).to.be.greaterThan(0);
+    doomsday = doomsday.connect(DAO);
+    await doomsday.transferFrom(DAO_ADDRESS, doomsdayBountyAddress, bunkerId);
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(doomsdayBountyAddress);
+
+    // nobody except DAO should be able to make an arbitrary call and transfer NFT
+    const [anybody] = await ethers.getSigners();
+    const payload = doomsday.interface.encodeFunctionData("transferFrom", [
+      doomsdayBountyAddress,
+      anybody.address,
+      bunkerId,
+    ]);
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    try {
+      await doomsdayBounty.execute(DOOMSDAY, 0, payload);
+      expect.fail("the transaction should fail");
+    } catch (e: any) {
+      expect(e.message).to.contain("not DAO");
+    }
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(doomsdayBountyAddress);
+
+    // DAO should be able to make an arbitrary call and transfer NFT to anybody
+    doomsdayBounty = doomsdayBounty.connect(DAO);
+    await doomsdayBounty.execute(DOOMSDAY, 0, payload);
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(anybody.address);
+  });
 });
