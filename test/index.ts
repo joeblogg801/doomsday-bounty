@@ -8,6 +8,7 @@ import { Doomsday, findClosest, findWinningStrategy, IBunker } from "./game";
 const PIN_BLOCK = 14200400;
 const DOOMSDAY = "0xd6e382aa7A09fc4A09C2fb99Cfce6A429985E65d";
 const DAO_ADDRESS = "0x7BB7bd0e8923B1f698eeaf0AB49834B8f1810d58";
+const OWNER_ADDRESS = "0xaFA33991B1a03B0f79351439457059150cd6DdC0";
 
 const NO_FUNDS_ADDRESS = "0x39355a7b5F15361582e55852af9C6b061bA4c10d";
 
@@ -88,7 +89,7 @@ describe("DoomsdayBounty", function () {
         lastImpact,
       });
     }
-    const bountyBlock = PIN_BLOCK + 3;
+    const bountyBlock = PIN_BLOCK + 4;
     const eliminationBlock =
       bountyBlock - (bountyBlock % IMPACT_BLOCK_INTERVAL) - 5;
     const hash = BigInt(
@@ -111,6 +112,28 @@ describe("DoomsdayBounty", function () {
       to: NO_FUNDS_ADDRESS,
       value: parseEther("0.1"),
     });
+
+    // owner withdraws their cut
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [OWNER_ADDRESS],
+    });
+    {
+      doomsday = doomsday.connect(
+        await ethers.provider.getSigner(OWNER_ADDRESS)
+      );
+      const ownerBalanceBefore = await ethers.provider.getBalance(
+        OWNER_ADDRESS
+      );
+      const tx = await doomsday.ownerWithdraw();
+      const receipt = await tx.wait();
+      const gasPayment = receipt.effectiveGasPrice.mul(receipt.gasUsed);
+      const ownerBalanceAfter = await ethers.provider.getBalance(OWNER_ADDRESS);
+      const ownerPayment = ownerBalanceAfter
+        .sub(ownerBalanceBefore)
+        .add(gasPayment);
+      console.log("Owner payment", formatEther(ownerPayment));
+    }
 
     await network.provider.send("evm_setAutomine", [false]);
 
@@ -200,5 +223,51 @@ describe("DoomsdayBounty", function () {
     console.log("Bounty payment", formatEther(bountyPayment));
     expect(daoPayment.gt(parseEther("100"))).to.equal(true);
     expect(bountyPayment.gt(parseEther("5"))).to.equal(true);
+
+    const doomsdayBalanceAfter = await ethers.provider.getBalance(DOOMSDAY);
+    console.log("Doomsday balance", formatEther(doomsdayBalanceAfter));
+  });
+
+  it("should be possible to transfer bunker out of contract back to DAO", async function () {
+    const DAO = await ethers.provider.getSigner(DAO_ADDRESS);
+
+    // DAO deploys bounty contract
+    const DoomsdayBounty = await ethers.getContractFactory(
+      "DoomsdayBounty",
+      DAO
+    );
+    let doomsdayBounty =
+      (await DoomsdayBounty.deploy()) as any as DoomsdayBounty;
+    const doomsdayBountyAddress = (doomsdayBounty as any).address;
+    expect(isAddress(doomsdayBountyAddress)).to.equal(true);
+
+    let doomsday = (await ethers.getContractAt(
+      "IDoomsday",
+      DOOMSDAY
+    )) as any as IDoomsday;
+    // find a non vulnerable bunker owned by DAO
+    let bunkerId = 0;
+    for (const [tokenId] of bunkerData) {
+      if (!(await doomsday.isVulnerable(tokenId))) {
+        const owner = await doomsday.ownerOf(tokenId);
+        if (owner === DAO_ADDRESS) {
+          bunkerId = tokenId;
+          break;
+        }
+      }
+    }
+    expect(bunkerId).to.be.greaterThan(0);
+    doomsday = doomsday.connect(DAO);
+
+    // DAO transfer the bunker to bounty contract
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
+    await doomsday.transferFrom(DAO_ADDRESS, doomsdayBountyAddress, bunkerId);
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(doomsdayBountyAddress);
+
+    // anybody should be able to transfer the bunker back to DAO
+    const [anybody] = await ethers.getSigners();
+    doomsdayBounty = doomsdayBounty.connect(anybody);
+    await doomsdayBounty.transferToDAO(bunkerId);
+    expect(await doomsday.ownerOf(bunkerId)).to.equal(DAO_ADDRESS);
   });
 });

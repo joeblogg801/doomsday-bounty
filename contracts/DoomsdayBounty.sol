@@ -7,7 +7,9 @@ interface IDoomsday {
     function destroyed() external view returns (uint256);
     function evacuate(uint256 _tokenId) external;
     function getStructuralData(uint256 _tokenId) external view returns (uint8 reinforcement, uint8 damage, bytes32 lastImpact);
+    function isVulnerable(uint256 _tokenId) external view returns (bool);
     function ownerOf(uint256 _tokenId) external view returns (address);
+    function ownerWithdraw() external;
     function setApprovalForAll(address _operator, bool _approved) external;
     function totalSupply() external view returns (uint256);
     function transferFrom(address _from, address _to, uint256 _tokenId) external;

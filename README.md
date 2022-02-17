@@ -9,43 +9,43 @@ subject to the following condition: DAO receives a (winning prize - bounty hunte
 # Details
 - the bounty is only valid if DAO did not win yet. The win is defined as DAO owning
 all remaining bunkers. The bounty is valid if there are some bunkers not
-owned by DAO [Link](./contracts/DoomsdayBounty.sol#L59)
+owned by DAO [Link](./contracts/DoomsdayBounty.sol#L61)
 - the bounty is only valid if the bounty hunter managed to end
-the game [Link](./contracts/DoomsdayBounty.sol#L66) 
+the game [Link](./contracts/DoomsdayBounty.sol#L68) 
 - the bounty is only valid if at the end of the game the bounty contract owns
 a winning bunker so it can claim a prize on behalf of 
-DAO [Link](./contracts/DoomsdayBounty.sol#L67)
+DAO [Link](./contracts/DoomsdayBounty.sol#L69)
 - the bounty is only valid if the prize has a reasonable 
-size [Link](./contracts/DoomsdayBounty.sol#L70)
+size [Link](./contracts/DoomsdayBounty.sol#L72)
 - the bounty is only valid if the bounty contract was able to receive the prize
-from the Doomsday contract [Link](./contracts/DoomsdayBounty.sol#L75)
+from the Doomsday contract [Link](./contracts/DoomsdayBounty.sol#L77)
 - the bounty is only valid if the bounty hunter received 
-the bounty [Link](./contracts/DoomsdayBounty.sol#L79)
+the bounty [Link](./contracts/DoomsdayBounty.sol#L81)
 - the bounty is only valid if DAO received the rest of winning prize after
-paying the bounty hunter fee [Link](./contracts/DoomsdayBounty.sol#L81)
+paying the bounty hunter fee [Link](./contracts/DoomsdayBounty.sol#L83)
 
 # DAO rights
 - DAO has an exclusive right to set a bounty fee percentage between
-0% and 10% at any time [Link](./contracts/DoomsdayBounty.sol#L47)
+0% and 10% at any time [Link](./contracts/DoomsdayBounty.sol#L49)
 - DAO has an exclusive right to withdraw any ETH from this contract
-at any time [Link](./contracts/DoomsdayBounty.sol#L104)
+at any time [Link](./contracts/DoomsdayBounty.sol#L106)
 - DAO has an exclusive right to perform any operations on behalf of
 the bounty contract at any time. For example if for some reason somebody
 sends a NFT or WETH to this contract, DAO has an exclusive right to
-transfer assets anywhere they wish [Link](./contracts/DoomsdayBounty.sol#L109)
+transfer assets anywhere they wish [Link](./contracts/DoomsdayBounty.sol#L111)
 
 
 # Rights granted to anybody including DAO
 - everybody has a right to transfer a bunker out of this contract to the DAO. 
 If the bounty is successful the contract will own a winning bunker. Anybody
 including DAO can transfer this bunker back to 
-DAO [Link](./contracts/DoomsdayBounty.sol#L98)
+DAO [Link](./contracts/DoomsdayBounty.sol#L100)
 
-# Right granted to a bounty hunter (*only* during hunt)
+# Rights granted to a bounty hunter (*only* during a bounty hunt)
 - bounty hunter has a right to evacuate any 
-DAO bunker [Link](./contracts/DoomsdayBounty.sol#L88)
+DAO bunker [Link](./contracts/DoomsdayBounty.sol#L90)
 - bounty hunter has a right to transfer any DAO bunker
-to the bounty contract [Link](./contracts/DoomsdayBounty.sol#L94)
+to the bounty contract [Link](./contracts/DoomsdayBounty.sol#L96)
  
 
 # Operation of contract
