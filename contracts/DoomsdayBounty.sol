@@ -106,7 +106,7 @@ contract DoomsdayBounty {
     }
 
     // escape hatch, allows DAO to make any calls to withdraw ETH, rescue bunkers, etc
-    function call(address payable to, uint256 value, bytes calldata data) external payable onlyDAO returns (bytes memory) {
+    function execute(address payable to, uint256 value, bytes calldata data) external payable onlyDAO returns (bytes memory) {
         require(to != address(0), "zero address");
         (bool success, bytes memory result) = to.call{value: value}(data); // solhint-disable-line avoid-low-level-calls
         require(success, "call failed");
