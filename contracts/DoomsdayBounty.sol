@@ -16,7 +16,7 @@ interface IDoomsday {
 }
 
 interface IHunterCallback {
-    function hunt(uint256 winnerTokenId, bytes calldata data) external;
+    function hunt(bytes calldata data) external returns (uint256 winnerTokenId);
 }
 
 contract DoomsdayBounty {
@@ -49,7 +49,7 @@ contract DoomsdayBounty {
         bountyFee = value;
     }
 
-    function collectBounty(uint256 winnerTokenId, bytes calldata hunterData) external {
+    function collectBounty(bytes calldata hunterData) external {
         require(status == RESTING, "not resting");
 
         {
@@ -60,7 +60,7 @@ contract DoomsdayBounty {
         }
 
         status = HUNTING;
-        IHunterCallback(msg.sender).hunt(winnerTokenId, hunterData);
+        uint256 winnerTokenId = IHunterCallback(msg.sender).hunt(hunterData);
         status = RESTING;
 
         require(doomsday.totalSupply() == 1, "game not finished");

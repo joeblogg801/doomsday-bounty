@@ -1,5 +1,6 @@
 {
   "name": "doomsday-bounty",
+  "version": "0.0.1",
   "engines": {
     "node": ">=14.0.0"
   },

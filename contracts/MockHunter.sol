@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./DoomsdayBounty.sol";
 
-contract MockHunter {
+contract MockHunter is IHunterCallback {
 
     IDoomsday private constant doomsday = IDoomsday(0xd6e382aa7A09fc4A09C2fb99Cfce6A429985E65d);
     DoomsdayBounty private immutable bounty;
@@ -23,14 +23,16 @@ contract MockHunter {
     )
         external
     {
-        bytes memory data = abi.encode(hits, evacs, transfers);
-        bounty.collectBounty(winnerTokenId, data);
+        bytes memory data = abi.encode(winnerTokenId, hits, evacs, transfers);
+        bounty.collectBounty(data);
     }
 
-    function hunt(uint256 winnerTokenId, bytes calldata data) external {
+    function hunt(bytes calldata data) external returns (uint256 winnerTokenId) {
         require(msg.sender == address(bounty));
-        (uint256[] memory hits, uint256[] memory evacs, uint256[] memory transfers) =
-            abi.decode(data, (uint256[], uint256[], uint256[]));
+        uint256[] memory hits;
+        uint256[] memory evacs;
+        uint256[] memory transfers;
+        (winnerTokenId, hits, evacs, transfers) = abi.decode(data, (uint256, uint256[], uint256[], uint256[]));
 
         uint256 len = hits.length;
         for (uint256 i = 0; i < len; i += 1) {
