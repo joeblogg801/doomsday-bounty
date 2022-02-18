@@ -1,5 +1,5 @@
 import assert from "assert";
-import { hexlify, solidityPack } from "ethers/lib/utils";
+import { hexlify, solidityKeccak256 } from "ethers/lib/utils";
 
 export interface IBunker {
   tokenId: number;
@@ -50,7 +50,7 @@ export class Doomsday {
 
   private static encodeImpact(_impact: string): string {
     // return _impact;
-    const v = BigInt(_impact) % (2n ** 240n - 1n);
+    const v = BigInt(_impact) % 2n ** 240n;
     return hexlify(v);
   }
 
@@ -76,7 +76,7 @@ export class Doomsday {
     const y = ((hash / MAP_WIDTH) % MAP_HEIGHT) - MAP_HEIGHT / 2n;
     const radius = ((hash / MAP_WIDTH / MAP_HEIGHT) % o) + o;
 
-    const impactId = solidityPack(["int64[]", "int64"], [[x, y], radius]);
+    const impactId = solidityKeccak256(["int64[]", "int64"], [[x, y], radius]);
     // const impactId = `${x}|${y}|${radius}`;
     return { x, y, radius, impactId };
   }
